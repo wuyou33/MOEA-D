@@ -7,6 +7,7 @@
 //
 //
 #include "loader.hpp"
+#include "randG.h"
 #include <iostream>
 using namespace std;
 
@@ -16,7 +17,10 @@ int main(){
     struct Constraint port1_constraint;
     double port1_correlations[31][31] = {};
     vector <struct asset> assetArray;
-
+    //
+    //Check input
+    //
+    /*
     if(loadItem(  FILE_PATH,
                 assetArray,
                 port1_constraint,
@@ -24,5 +28,12 @@ int main(){
         for (int i = 0; i < port1_constraint.num_assets; i++) {
             cout << assetArray[i].holding << endl;
         }
+    }
+     */
+    //
+    //Check random number genrator
+    //
+    for(int i = 0; i<10; i++){
+        cout<<randG()<<endl;
     }
 }

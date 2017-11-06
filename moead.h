@@ -1,5 +1,3 @@
-
-
 //
 //  MOEA-D.cpp
 //  MOEA/D
@@ -15,9 +13,23 @@
 #include <ctime>
 #include <cmath>
 #include <random>
+#include <gsl>
+#include "randG.h"
 #include "loader.hpp"
 #define N 200
 
+struct lamb{
+    //
+    //Size of weight vector is determined by the number of objective of MOP.
+    //To make it easy to implement, we only consider profit and risk, where k = 2.
+    //According to the contribution of [2], the corresponding H = 99, and N = 100;
+    //
+    double v[2];
+};
+
+bool init_lamb( const int &k, const int &H ){
+
+}
 double evalue(const std::vector<struct asset> &assetArray){
     double value = 0;
     double income = 0;
@@ -56,9 +68,7 @@ void surgeIn(const std::vector<struct asset> &assetArray, const Constraint&const
 }
 
 
-struct lamb{
-    double v[2];
-};
+
 struct solution{
     std::vector<int> gene;
     double fitness[2]={};
@@ -116,7 +126,7 @@ void solutionInitial(struct solution &x,
     x.fitness[1] = -covariance(x.gene, asset, correlation);
 }
 
-void Initialize(struct Individual &candidate,
+void init_all(struct Individual &candidate,
                 const std::vector<struct asset> &asset,
                 const double (&correlation)[31][31]){
     //N is the number of subproblems.
@@ -415,7 +425,7 @@ void mainProcess(const std::vector<struct asset>&asset,
         solutionInitial(solu_buffer, asset, correlation);
         S.x.push_back(solu_buffer);
     }
-    //Generate lambda
+    //Generate lamb
     std::vector<struct lamb> lambList;
     for(int i = 1; i<=N; i++){
         struct lamb lamb_cache;
