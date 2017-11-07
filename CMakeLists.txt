@@ -8,6 +8,6 @@ link_libraries(${GSL_LIBRARIES} ${GSLBLAS_LIBRARIES})
 
 
 
-set(SOURCE_FILES main.cpp loader.hpp DataSet DataSet/portreb1.txt moead.h randG.h)
-add_executable(MOEA_D ${SOURCE_FILES} loader.hpp randG.h)
+set(SOURCE_FILES main.cpp loader.h DataSet DataSet/portreb1.txt moead.h randG.h)
+add_executable(MOEA_D ${SOURCE_FILES} loader.h randG.h)
 target_link_libraries (MOEA_D ${GSL_LIBRARIES} ${GSLBLAS_LIBRARIES})

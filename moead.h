@@ -13,23 +13,131 @@
 #include <ctime>
 #include <cmath>
 #include <random>
-#include <gsl>
+#include <exception>
 #include "randG.h"
-#include "loader.hpp"
-#define N 200
+#include "loader.h"
+#define N 100
+#define K 11//Cannot assign 10. I don't know why.
 
+struct solution{//i.e. x_i
+    std::vector<int> gene;
+    double fitness[2]={};
+
+    struct solution &operator = (const struct solution x){
+        this->gene.clear();
+        for(int i = 0; i<x.gene.size(); i++){
+            this->gene.push_back(x.gene[i]);
+        }
+        this->fitness[0] = x.fitness[0];
+        this->fitness[1] = x.fitness[1];
+        return *this;
+    }
+};
+struct population{
+    std::vector<solution> x;
+};
 struct lamb{
     //
     //Size of weight vector is determined by the number of objective of MOP.
     //To make it easy to implement, we only consider profit and risk, where k = 2.
-    //According to the contribution of [2], the corresponding H = 99, and N = 100;
+    //According to the contribution of [2], the corresponding
+    // H = 99, and N = 100;
     //
-    double v[2];
+    double v[2] = {};
+    int id = 0;
+    std::vector<lamb>k_nearest;
+    lamb &operator = (const lamb&y){
+        for(int i = 0; i<2; i++){
+            this->v[i] = y.v[i];
+            i++;
+        }
+        this->v[0] = y.v[0];
+        this->v[1] = y.v[1];
+        for(int i = 0; i<this->k_nearest.size(); i++){
+            this->k_nearest[i] = y.k_nearest[i];
+        }
+        this->id = y.id;
+        return *this;
+    }
+
 };
 
-bool init_lamb( const int &k, const int &H ){
-
+bool operator<(lamb a, lamb b){
+    return a.v[0] < b.v[0];
 }
+bool init_lamb( const int &k, const int &H, std::vector<lamb>&lamb_list ){
+    for(int i = 0; i<N; i++){
+        double source_number = randG();
+        struct lamb buffer;
+        buffer.id = i;
+        buffer.v[0] = static_cast<double>(static_cast<int>(source_number*H))/ static_cast<double>(H);
+        //std::cerr<<i<<":"<<buffer.v[0]<<std::endl;
+        buffer.v[1] = 1 - buffer.v[0];
+        lamb_list.push_back(buffer);
+    }
+    return true;
+}
+void findK( const int i, int k, int upper, int*h){
+    int u = 0;
+    int d[2] = {};
+    bool up = false;
+    if(k%2!=0)
+        up = true;
+    if(i+k/2+(up?1:0)>=upper){
+        d[1] = upper-(i+k/2)+(up?1:0);
+        d[0] = k-d[1];
+    }
+    else{
+        d[1] = k/2+(up?1:0);
+        if(i-k/2-(up?1:0)>0)
+            d[0] = k/2+(up?1:0);
+        else{
+            d[0] = i;
+            d[1] = k-i;
+        }
+    }
+    for (int m = 1; m<=d[1]; m++) {
+        int buffer = i+m;
+        h[u] = buffer;
+        u++;
+    }
+    for(int m = 1; m<=d[0]; m++){
+        if(i == 0 )
+            std::cerr<<"error"<<std::endl;
+        int buffer = i-m;
+        h[u] = buffer;
+        u++;
+    }
+}
+
+void init_distance( std::vector<lamb> &lamb_list ){
+    std::priority_queue<lamb>nearest_list;
+    int length = lamb_list.size();
+    for(int i = 0; i<length; i++){
+        lamb buffer = lamb_list.back();
+        //std::cout<<buffer.v[0]<<"\t"<<buffer.v[1]<<std::endl;
+        lamb_list.pop_back();
+        nearest_list.push(buffer);
+    }
+    std::vector<lamb> toHandle;
+    while(!nearest_list.empty()){
+        lamb buffer = nearest_list.top();
+        toHandle.push_back(buffer);
+        nearest_list.pop();
+    }
+
+    for(int i = 0; i<toHandle.size(); i++){
+        lamb buffer = toHandle[i];
+        int h[K] = {};
+        findK(i, K, toHandle.size(), h);
+        for(int j = 0; j<K; j++){
+            buffer.k_nearest.push_back(toHandle[h[j]]);
+        }
+        lamb_list.push_back(buffer);
+    }
+    std::cerr<<"[1.2]: ******Init Distance*****"<<std::endl;
+}
+
 double evalue(const std::vector<struct asset> &assetArray){
     double value = 0;
     double income = 0;
@@ -40,6 +148,26 @@ double evalue(const std::vector<struct asset> &assetArray){
     return income/value;
 }
 
+void init_solutions(struct solution &x,
+                    const std::vector <struct asset> &asset,
+                    const struct Constraint constraint,
+                    const double (&correlation)[31][31]){
+    std::cerr<<"[1.3]: *****Init Solutions*****"<<std::endl;
+    //Cardinality Constraint M:
+    int M = constraint.max_assets;
+    int num_assets = constraint.num_assets;
+    std::cerr<<"Number of Assets:\t"<<num_assets<<std::endl;
+    std::vector <int>pointers;
+    for(int i = 0; i<M; i++){
+        int buffer = static_cast<int>(randG()*(num_assets+1));
+        if(buffer>=num_assets)
+            buffer = -1;//Hold cash
+        std::cerr<<buffer<<"\t";
+        pointers.push_back(buffer);
+    }
+    std::cerr<<std::endl;
+
+}
 void current2target(const std::vector<struct asset> &assetArray,
                     const std::vector<struct asset> &targetArray,
                     std::vector<int> &offset,
@@ -69,25 +197,8 @@ void surgeIn(const std::vector<struct asset> &assetArray, const Constraint&const
 
 
 
-struct solution{
-    std::vector<int> gene;
-    double fitness[2]={};
 
-    struct solution &operator = (struct solution x){
-        this->gene.clear();
-        for(int i = 0; i<x.gene.size(); i++){
-            this->gene.push_back(x.gene[i]);
-        }
-        this->fitness[0] = x.fitness[0];
-        this->fitness[1] = x.fitness[1];
-        return *this;
-    }
-};
-struct Individual{
-    std::vector<solution> x;
-    int m = 0;//Number of asset & dimansion of solution space
 
-};
 size_t expectReturn(const std::vector<int>&x,
                     const std::vector<struct asset> &asset,
                     const size_t solution_size){
@@ -119,20 +230,15 @@ bool dominate(const struct solution &x, const struct solution&y){
     return true;
 }
 
-void solutionInitial(struct solution &x,
-                     const std::vector <struct asset> &asset,
-                     const double (&correlation)[31][31]){
-    x.fitness[0] = expectReturn(x.gene, asset, 31);
-    x.fitness[1] = -covariance(x.gene, asset, correlation);
-}
 
-void init_all(struct Individual &candidate,
+
+void init_all(struct population &candidate,
                 const std::vector<struct asset> &asset,
                 const double (&correlation)[31][31]){
     //N is the number of subproblems.
     //m is the dimension of solution space.
     for(int i = 0; i<N; i++){
-        solutionInitial(candidate.x[i], asset, correlation);
+        //init_solutions(candidate.x[i], asset, correlation);
     }
 }
 int calNumber(const std::vector<asset>&assetArray, const std::vector<int>&gene){
@@ -309,11 +415,7 @@ double randomDouble(){
     return x;
 }
 
-double EDistance(struct lamb x, struct lamb y){
-    double sum = 0;
-    sum += (y.v[0] - x.v[0])*(y.v[0] - x.v[0]) + (y.v[1] - x.v[1])*(y.v[1] - x.v[1]);
-    return sqrt(sum);
-}
+
 struct closet{
     double distance = 0;
     int index = 0;
@@ -377,8 +479,8 @@ struct solution geneticOperation(const struct solution&x,
         mutation(offspring1, asset);
         mutation(offspring2, asset);
     }
-    solutionInitial(offspring1, asset, correlation);
-    solutionInitial(offspring2, asset, correlation);
+    //init_solutions(offspring1, asset, correlation);
+    //init_solutions(offspring2, asset, correlation);
     if(dominate(offspring1, offspring2))
         return offspring1;
     return offspring2;
@@ -411,8 +513,8 @@ void mainProcess(const std::vector<struct asset>&asset,
                  double mutate_rate,
                  const Constraint&constraints){
     //Read data from file
-    struct Individual EP;
-    struct Individual S;//Initial population
+    struct population EP;
+    struct population S;//Initial population
 
     for(int i = 0; i<N; i++){
         struct solution solu_buffer;
@@ -422,7 +524,7 @@ void mainProcess(const std::vector<struct asset>&asset,
             buffer = cache_buffer;
             solu_buffer.gene.push_back(buffer);
         }
-        solutionInitial(solu_buffer, asset, correlation);
+        //init_solutions(solu_buffer, asset, correlation);
         S.x.push_back(solu_buffer);
     }
     //Generate lamb
@@ -443,9 +545,9 @@ void mainProcess(const std::vector<struct asset>&asset,
         for(int j = 0; j<N; j++){
             if(Ed[i][j] == 0){
                 struct closet c_buffer;
-                Ed[j][i] = Ed[i][j] = EDistance(lambList[i], lambList[j]);
-                c_buffer.index = j;
-                c_buffer.distance = Ed[i][j];
+                //Ed[j][i] = Ed[i][j] = EDistance(lambList[i], lambList[j]);
+                //c_buffer.index = j;
+                //c_buffer.distance = Ed[i][j];
                 B_buffer.push(c_buffer);
             }
         }
@@ -527,5 +629,24 @@ void mainProcess(const std::vector<struct asset>&asset,
     }
 }
 
+void display_nn(const std::vector<lamb> &lamblist){
+    for(int i = 0; i<lamblist.size(); i++) {
+        std::cout << lamblist[i].v[0] << ", " << lamblist[i].v[1] << ":\t\t";
+        for (int j = 0; j < lamblist[i].k_nearest.size(); j++) {
+            std::cout << lamblist[i].k_nearest[j].v[0] << "," <<
+                 lamblist[i].k_nearest[j].v[1] << "\t";
+        }
+        std::cout << std::endl;
+    }
+}
 
+void display_nn_id( const std::vector<lamb> &lamblist){
+    for(int i = 0; i<lamblist.size(); i++){
+        std::cout<<lamblist[i].id<<":\t\t";
+        for(int j = 0; j<lamblist[i].k_nearest.size(); j++){
+            std::cout<<lamblist[i].k_nearest[j].id<<",\t";
+        }
+        std::cout<<std::endl;
+    }
+}
 #endif //MOEA_D_MOEAD_H

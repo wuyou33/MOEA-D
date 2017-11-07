@@ -5,6 +5,9 @@
 //  Created by Molin on 04/11/2017.
 //  Copyright © 2017 merlin. All rights reserved.
 //
+#ifndef MOEA_D_LOADER_H
+#define MOEA_D_LOADER_H
+
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -138,3 +141,4 @@ bool loadItem( std::string path,
     return true;
 }
 
+#endif
