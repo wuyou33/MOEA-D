@@ -26,9 +26,15 @@ int main(){
                 assetArray,
                 port1_constraint,
                 port1_correlations)) {
+        planA(assetArray);
+        /*
         for (int i = 0; i < port1_constraint.num_assets; i++) {
-            //cout << assetArray[i].holding << endl;
+            cout << assetArray[i].holding<<"\t"<<
+                 assetArray[i].min_buy<<"\t"<<
+                 assetArray[i].max_buy<< "\t"<<
+                 assetArray[i].max_sell<<endl;
         }
+         */
     }
 
     //
@@ -53,6 +59,6 @@ int main(){
     //display_nn(lamblist);
 
     //1.3 Initialization
-    solution x;
-    init_solutions(x, assetArray, port1_constraint, port1_correlations);
+    population x;
+    init_population(x, assetArray, port1_constraint, port1_correlations);
 }

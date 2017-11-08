@@ -43,6 +43,8 @@ struct asset
 
     bool sellable = false;
 
+    unsigned int id = 0;
+    double fundpool = 0;
     struct asset &operator=(struct asset x)
     {
         this->current_price = x.current_price;
@@ -55,6 +57,8 @@ struct asset
         this->min_sell = x.min_sell;
         this->max_buy = x.max_buy;
         this->max_sell = x.max_sell;
+        this->id = x.id;
+        this->fundpool = x.fundpool;
         return *this;
     }
 };
