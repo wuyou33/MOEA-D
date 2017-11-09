@@ -16,11 +16,22 @@
 #include <exception>
 #include "randG.h"
 #include "loader.h"
-//Population's size
+//Population's sizetrue
 #define N 100
 //K nearest neighbors
 #define K 11//Cannot assign 10. I don't know why.
 
+bool mainprocess = false;
+bool p_1_3_detail = false;
+bool show_gene = false;
+bool initial_detail = false;
+
+void setting(bool *s){
+    mainprocess = s[0];
+    p_1_3_detail = s[1];
+    show_gene = s[2];
+    initial_detail = s[3];
+}
 struct solution{//i.e. x_i
     std::vector<int> gene;
     double fitness[2]={};
@@ -63,10 +74,11 @@ struct lamb{
     }
 
 };
+
 void planA(std::vector<struct asset>&assetArray){
     for(int i = 0; i<assetArray.size(); i++){
         assetArray[i].max_buy = assetArray[i].max_buy+assetArray[i].holding;
-        assetArray[i].holding = 0;
+        //assetArray[i].holding = 0;
     }
 }
 bool operator<(lamb a, lamb b){
@@ -118,7 +130,7 @@ void findK( const int i, int k, int upper, int*h){
 }
 
 void init_distance( std::vector<lamb> &lamb_list ){
-    std::cerr<<"[1.2]: Start\tInit Distance"<<std::endl;
+    if(mainprocess)   std::cerr<<"[1.2]: Start\tInit Distance"<<std::endl;
     std::priority_queue<lamb>nearest_list;
     int length = lamb_list.size();
     for(int i = 0; i<length; i++){
@@ -143,7 +155,19 @@ void init_distance( std::vector<lamb> &lamb_list ){
         }
         lamb_list.push_back(buffer);
     }
-    std::cerr<<"[1.2]: End\t\tInit Distance"<<std::endl;
+    if(mainprocess)   std::cerr<<"[1.2]: *End*\tInit Distance"<<std::endl;
+}
+
+void ffunction(const solution&x,
+               const std::vector<asset>&assetArray,
+               double&income,
+               double&risk){
+    for(int i = 0; i<x.gene.size(); i++){
+        if(x.gene[i]!=0){
+            income+=x.gene[i]*assetArray[i].mean_income;
+            risk+=x.gene[i]*assetArray[i].diviation_r;
+        }
+    }
 }
 
 double evalue(const std::vector<struct asset> &assetArray){
@@ -155,43 +179,103 @@ double evalue(const std::vector<struct asset> &assetArray){
     }
     return income/value;
 }
-void fund_distribute(  std::vector<struct asset>&p, double fund, int n){
-    if(fund == 0)   return;
+
+void fund_distribute( std::vector<struct asset>&p, double&fund, int n, int mode){
+
+    if(p[n].max_buy<p[n].min_buy){
+        check:
+        bool buyable = false;
+        for (int i = 0; i < p.size(); i++) {
+            if (p[i].max_buy > p[i].min_buy&&fund/p[i].current_price>p[i].min_buy) {
+                buyable = true;
+            }
+        }
+        if(buyable){
+            for (int i = 0; i < p.size(); i++) {
+                if (p[i].max_buy > p[i].min_buy&&fund/p[i].current_price>p[i].min_buy) {
+                    fund_distribute(p, fund, i, 0);
+                }
+            }
+        }
+        if(buyable) goto check;
+        return;
+    }
+
+    if(fund/p[n].current_price<p[n].min_buy){
+        for(int i = 0; i<p.size(); i++){
+            if(fund/p[i].current_price>=p[i].min_buy){
+                fund_distribute(p, fund, i, 0);
+            }
+        }
+        return;
+    }
+
     double dice = randG();
-    double local_fund = (dice * (p[n].max_buy-p[n].min_buy)+
-                         p[n].min_buy)*p[n].current_price;
+    double raw_buy = (dice * (p[n].max_buy-p[n].min_buy));
+    if(raw_buy<0){
+        std::cerr<<"!!!!Error\n";
+    }
+    int buy_number = static_cast<int>(dice * (p[n].max_buy-p[n].min_buy) + p[n].min_buy);
+
+    double local_fund = buy_number*p[n].current_price;
+    if(local_fund>fund){
+        local_fund = fund;
+        buy_number = local_fund/p[n].current_price;
+        if(buy_number == 0){
+            //std::cerr<<local_fund<<std::endl;
+        }
+        return;
+    }
     p[n].fundpool+=local_fund;
-    if(n<=0){
+    p[n].buy_asset_number += buy_number;
+    p[n].max_buy -=buy_number;
+    p[n].history.push_back(-buy_number);
+    fund -=local_fund;
+    if(n<=0||mode == 1){
+        rn:
         double s = randG();
-        fund_distribute(p, fund - local_fund, int(s*p.size()));
+        fund_distribute(p, fund, int(s*p.size()),1);
     }
     else {
-        fund_distribute(p, fund - local_fund, n - 1);
+        fund_distribute(p, fund, n - 1, 0);
     }
 }
+
 void init_solution( std::vector<struct asset> &tobuy,
-                    const double&fund){
-    int num = tobuy.size();
-    fund_distribute(tobuy, fund, tobuy.size()-1);
+                    double&fund){
+    fund_distribute(tobuy, fund, tobuy.size()-1, 0);
+    if(initial_detail){
+        for(int i = 0; i<tobuy.size(); i++){
+            std::cerr<<"ID: "<<tobuy[i].id<<"\tMax: "<<tobuy[i].max_buy<<"\tMin: "
+                     <<tobuy[i].min_buy<<"\tBuy: "<<tobuy[i].buy_asset_number<<"\t";
+            for(auto item:tobuy[i].history){
+                std::cerr<<item<<"\t";
+            }
+            std::cerr<<std::endl;
+        }
+    }
 }
 void init_population(struct population &x,
                     const std::vector <struct asset> &asset,
                     const struct Constraint constraint,
                     const double (&correlation)[31][31]){
-    std::cerr<<"[1.3]: Start\tInit Population"<<std::endl;
+    if(mainprocess)   std::cerr<<"[1.3]: Start\tInit Population"<<std::endl;
     //Cardinality Constraint M:
     int M = constraint.max_assets;
     int num_assets = constraint.num_assets;
     //std::cerr<<"Number of Assets:\t"<<num_assets<<std::endl;
     //
-    double fundpool;
-    for(int i = 0; i<asset.size(); i++){
-        fundpool += asset[i].current_price*asset[i].holding;
+    double fundpool = 0;
+    size_t fundpool_l = 0;
+    for(int i = 0; i<asset.size(); i++) {
+        fundpool += asset[i].current_price * asset[i].holding;
+        fundpool_l += asset[i].current_price * asset[i].holding;
     }
-
     for(int i = 0; i<N; i++){
         solution xi_buffer;
+        struct Set candidate;
         //Handling cardinality constraint by using pointers.
+        //std::cerr<<"[1.3]: \t\tStart\tassign assets\n";
         std::vector<struct asset>tobuy;
         for(int i = 0; i<M; i++){
             int buffer = static_cast<int>(randG()*(num_assets+1));
@@ -199,24 +283,53 @@ void init_population(struct population &x,
                 buffer = -1;//Hold cash
             //std::cerr<<buffer<<"\t";
             if(buffer>=0) {
-                struct asset asset_buffer = asset[buffer];
-                asset_buffer.id = buffer;
-                tobuy.push_back(asset_buffer);
+                if(!candidate.isin(buffer)){
+                    candidate.data.push_back(buffer);
+                }
             }
         }
-        std::cerr<<std::endl;
-        //TODO: DEBUG
-        init_solution(tobuy, fundpool);
+        for(int i = 0; i<candidate.data.size(); i++){
+            int buffer_id = candidate.data[i];
+            struct asset asset_buffer = asset[buffer_id];
+            asset_buffer.id = buffer_id;
+            tobuy.push_back(asset_buffer);
+        }
+        std::priority_queue<int, std::vector<int>, std::greater<int>>tobuy_ase;
+        for(int i = 0; i<tobuy.size(); i++){
+            //std::cerr<<tobuy[i].id<<"\t";
+            int buffer = tobuy[i].id;
+            tobuy_ase.push(buffer);
+        }
+        if(p_1_3_detail) {
+            std::cerr << "Port\t" << i << ":\t";
+            while (!tobuy_ase.empty()) {
+                std::cerr << tobuy_ase.top() << "\t";
+                tobuy_ase.pop();
+            }
+            std::cerr << std::endl;
+        }
+        //if(mainprocess)   std::cerr<<"[1.3]: \t\tEnd\t\tassign assets\n";
+        //if(mainprocess)   std::cerr<<"[1.3]: \t\tStart\tInitialize Solution\n";
+        double fund_buffer = fundpool;
+        init_solution(tobuy, fund_buffer);
+        if(p_1_3_detail)   std::cerr<<"[1.3]: Fund remain:"<<fund_buffer<<std::endl;
+        //if(mainprocess)   std::cerr<<"[1.3]: \t\tEnd\t\tInitialize Solution\n";
         for(int j = 0; j<asset.size(); j++){
             xi_buffer.gene.push_back(0);
         }
         for(auto item:tobuy){
-            xi_buffer.gene[item.id] = item.fundpool;
+            xi_buffer.gene[item.id] = item.buy_asset_number;
         }
         x.xi.push_back(xi_buffer);
+        if(show_gene) {
+            for (int i = 0; i < xi_buffer.gene.size(); i++) {
+                std::cout << xi_buffer.gene[i] << " ";
+            }
+            std::cout << std::endl;
+        }
     }
 
-
+    if(mainprocess)   std::cerr<<"[1.3]: *End*\tInit Population"<<std::endl;
 }
 void current2target(const std::vector<struct asset> &assetArray,
                     const std::vector<struct asset> &targetArray,

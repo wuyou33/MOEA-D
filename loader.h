@@ -33,9 +33,9 @@ struct asset
     double cost_sell = 0;
     double vcost_buy = 0;
     double vcost_sell = 0;
-    double min_buy = 0;
-    double min_sell = 0;
-    double max_buy = 0;
+    int min_buy = 0;
+    int min_sell = 0;
+    int max_buy = 0;
     double max_sell = 0;
 
     double mean_income = 0;
@@ -45,6 +45,8 @@ struct asset
 
     unsigned int id = 0;
     double fundpool = 0;
+    int buy_asset_number = 0;
+    std::vector<int>history;
     struct asset &operator=(struct asset x)
     {
         this->current_price = x.current_price;
@@ -59,10 +61,20 @@ struct asset
         this->max_sell = x.max_sell;
         this->id = x.id;
         this->fundpool = x.fundpool;
+        this->buy_asset_number = x.buy_asset_number;
         return *this;
     }
 };
 
+struct Set{
+    std::vector<int>data;
+    bool isin(const int &x){
+        for(int i = 0; i<data.size(); i++){
+            if(data[i]==x)  return true;
+        }
+        return false;
+    }
+};
 //
 //Loader function
 //
@@ -142,7 +154,9 @@ bool loadItem( std::string path,
         }
         line++;
     }
+    data.close();
     return true;
+
 }
 
 #endif

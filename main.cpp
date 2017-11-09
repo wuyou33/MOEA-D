@@ -18,6 +18,13 @@ int main(){
     struct Constraint port1_constraint;
     double port1_correlations[31][31] = {};
     vector <struct asset> assetArray;
+    bool s[4] = {1,0,0,0};
+    for(int i =0; i<4; i++){
+        char buffer;
+        //buffer = getchar();
+        //s[i] = (buffer =='1'?true:false);
+    }
+    setting(s);
     //
     //Check input
     //
@@ -35,6 +42,7 @@ int main(){
                  assetArray[i].max_sell<<endl;
         }
          */
+
     }
 
     //
@@ -61,4 +69,7 @@ int main(){
     //1.3 Initialization
     population x;
     init_population(x, assetArray, port1_constraint, port1_correlations);
+
+    //1.4 Initialize Z solution
+
 }
