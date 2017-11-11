@@ -158,28 +158,21 @@ void init_distance( std::vector<lamb> &lamb_list ){
     if(mainprocess)   std::cerr<<"[1.2]: *End*\tInit Distance"<<std::endl;
 }
 
-void ffunction(const solution&x,
+void ffunction(const solution&xi,
                const std::vector<asset>&assetArray,
                double&income,
                double&risk){
-    for(int i = 0; i<x.gene.size(); i++){
-        if(x.gene[i]!=0){
-            income+=x.gene[i]*assetArray[i].mean_income;
-            risk+=x.gene[i]*assetArray[i].diviation_r;
+    for(int i = 0; i<xi.gene.size(); i++){
+        if(xi.gene[i]!=0){
+            income+=xi.gene[i]*assetArray[i].mean_income;
+            risk+=xi.gene[i]*assetArray[i].diviation_r;
         }
     }
-}
-
-double evalue(const std::vector<struct asset> &assetArray){
-    double value = 0;
-    double income = 0;
-    for(int i = 0; i<assetArray.size(); i++){
-        value+=assetArray[i].holding*assetArray[i].current_price;
-        income += assetArray[i].holding*assetArray[i].mean_income;
+    if(p_1_3_detail) {
+        std::cerr << "[1.3]: Income:\t" << income
+                  << "\tRisk:\t" << risk << std::endl;
     }
-    return income/value;
 }
-
 void fund_distribute( std::vector<struct asset>&p, double&fund, int n, int mode){
 
     if(p[n].max_buy<p[n].min_buy){
@@ -301,7 +294,7 @@ void init_population(struct population &x,
             tobuy_ase.push(buffer);
         }
         if(p_1_3_detail) {
-            std::cerr << "Port\t" << i << ":\t";
+            std::cerr << "[1.3]:\tPort " << i << ":\t";
             while (!tobuy_ase.empty()) {
                 std::cerr << tobuy_ase.top() << "\t";
                 tobuy_ase.pop();
@@ -320,6 +313,11 @@ void init_population(struct population &x,
         for(auto item:tobuy){
             xi_buffer.gene[item.id] = item.buy_asset_number;
         }
+        double income_buffer = 0;
+        double risk_buffer;
+        ffunction(xi_buffer, asset, income_buffer, risk_buffer);
+        xi_buffer.fitness[0] = income_buffer;
+        xi_buffer.fitness[1] = risk_buffer;
         x.xi.push_back(xi_buffer);
         if(show_gene) {
             for (int i = 0; i < xi_buffer.gene.size(); i++) {
@@ -328,36 +326,29 @@ void init_population(struct population &x,
             std::cout << std::endl;
         }
     }
-
     if(mainprocess)   std::cerr<<"[1.3]: *End*\tInit Population"<<std::endl;
 }
-void current2target(const std::vector<struct asset> &assetArray,
-                    const std::vector<struct asset> &targetArray,
-                    std::vector<int> &offset,
-                    const Constraint&constraint){
-    int buffer;
-    for(int i = 0; i<assetArray.size(); i++){
-        buffer = targetArray[i].holding - assetArray[i].holding;
-        offset.push_back(buffer);
-        //For change
+
+void updateP(const std::vector<lamb>&lamblist,
+             double z[2],
+             const population &x){
+    if(mainprocess){
+        std::cerr<<"[2]:\tUpdate\n";
+    }
+    //
+    //  [2.1] Reproduction
+    //
+    if(mainprocess){
+        std::cerr<<"[2.1]:\tStart\tReporduction\n";
+    }
+    for(int i = 0; i<N; i++){
+
+        int m = lamblist[i].k_nearest[static_cast<int>(randG() * lamblist[i].k_nearest.size())].id;
+        int n = lamblist[i].k_nearest[static_cast<int>(randG() * lamblist[i].k_nearest.size())].id;
+        //if(mainprocess) std::cerr<<"[2.1]:\tm:"<<m<<"\tn:"<<n<<std::endl;
+
     }
 }
-
-double surgeOut(const std::vector<struct asset> &assetArray){
-    double fundPool = 0;
-    for(int i = 0; i < assetArray.size(); i++){
-        fundPool += assetArray[i].holding * assetArray[i].current_price;
-    }
-    return fundPool;
-}
-
-void surgeIn(const std::vector<struct asset> &assetArray, const Constraint&constraints, double fundPool){
-    if(fundPool<=0)
-        return;
-    std::vector<int> skeleton;
-
-}
-
 
 
 

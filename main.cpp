@@ -39,7 +39,8 @@ int main(){
             cout << assetArray[i].holding<<"\t"<<
                  assetArray[i].min_buy<<"\t"<<
                  assetArray[i].max_buy<< "\t"<<
-                 assetArray[i].max_sell<<endl;
+                 assetArray[i].max_sell<<"\t"<<
+                 assetArray[i].mean_income<<endl;
         }
          */
 
@@ -69,7 +70,26 @@ int main(){
     //1.3 Initialization
     population x;
     init_population(x, assetArray, port1_constraint, port1_correlations);
-
+    population ep;
     //1.4 Initialize Z solution
+    double z_population[2];
+    double max_income = 0;
+    double min_risk = x.xi[0].fitness[1];
+    for(int i = 0; i<x.xi.size(); i++){
+        if(x.xi[i].fitness[0]>max_income){
+            max_income = x.xi[i].fitness[0];
+        }
+        if(x.xi[i].fitness[1]<min_risk){
+            min_risk = x.xi[i].fitness[1];
+        }
+    }
+    z_population[0] = max_income;
+    z_population[1] = min_risk;
+    cerr<<"[1.4]:\tInitialize z pupulation:\t"
+        <<"\n\t\tMax income:\t"<<z_population[0]<<"\t"<<"\tMin risk:\t"
+        <<z_population[1]<<endl;
+
+    //[2] Update population
+    updateP(lamblist, z_population, x);
 
 }
