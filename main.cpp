@@ -18,7 +18,7 @@ int main(){
     struct Constraint port1_constraint;
     double port1_correlations[31][31] = {};
     vector <struct asset> assetArray;
-    bool s[4] = {1,0,0,0};
+    bool s[4] = {0,0,0,0};
     for(int i =0; i<4; i++){
         char buffer;
         //buffer = getchar();
@@ -90,6 +90,6 @@ int main(){
         <<z_population[1]<<endl;
 
     //[2] Update population
-    updateP(lamblist, z_population, x);
+    //updateP(lamblist, z_population, x);
 
 }
