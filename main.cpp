@@ -90,6 +90,14 @@ int main(){
         <<z_population[1]<<endl;
 
     //[2] Update population
-    //updateP(lamblist, z_population, x);
-
+    population new_x;
+    process_updateP(lamblist, z_population, x, new_x, assetArray);
+    int test_set[32] = {0,0,191,82,176,0,0,64,0,0,0,69,70,0,226, 0, 76, 0, 0, 58, 0, 0, 0, 0,
+                      0, 227, 0, 0, 0, 83, 65};
+    solution test_solution;
+    for(int i = 0; i<32; i++){
+        test_solution.gene.push_back(test_set[i]);
+    }
+    util_print_gene(test_solution);
+    util_repair_gene(test_solution, assetArray);
 }
