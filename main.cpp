@@ -13,8 +13,8 @@
 using namespace std;
 
 int main(){
-    std::string FILE_PATH = "/home/molin/CLionProjects/MOEA-D/DataSet/portreb1.txt";
-
+    //std::string FILE_PATH = "/home/molin/CLionProjects/MOEA-D/DataSet/portreb1.txt";
+    std::string FILE_PATH = "/Users/mirror/ClionProjects/MOEA-D/DataSet/portreb1.txt";
     struct Constraint port1_constraint;
     double port1_correlations[31][31] = {};
     vector <struct asset> assetArray;
