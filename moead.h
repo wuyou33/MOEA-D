@@ -24,16 +24,29 @@ bool mainprocess = false;
 bool p_1_3_detail = false;
 bool show_gene = false;
 bool initial_detail = false;
-
-void setting(bool *s){
+bool genetic_state = false;
+std::vector<asset>raw_asset;
+void setting(bool *s, const std::vector<asset>assetList){
     mainprocess = s[0];
     p_1_3_detail = s[1];
     show_gene = s[2];
     initial_detail = s[3];
+    for(auto asset_item:assetList){
+        raw_asset.push_back(asset_item);
+    }
 }
 struct solution{//i.e. x_i
     std::vector<int> gene;
+    std::vector<asset> raw_data;
     double fitness[2]={};
+    void init(){
+        for(auto asset_item:raw_asset){
+            raw_data.push_back(asset_item);
+        }
+    }
+    solution(){
+        init();
+    }
 
     struct solution &operator = (const struct solution x){
         this->gene.clear();
@@ -43,10 +56,21 @@ struct solution{//i.e. x_i
         this->fitness[0] = x.fitness[0];
         this->fitness[1] = x.fitness[1];
         return *this;
+        for(int i = 0; i<x.raw_data.size(); i++){
+            this->raw_data[i] = x.raw_data[i];
+        }
     }
 };
 struct population{
     std::vector<solution> xi;
+    struct population &operator = (const struct population x){
+        for(int i = 0; i<x.xi.size(); i++){
+            solution temp_push;
+            temp_push = x.xi[i];
+            this->xi.push_back(temp_push);
+        }
+        return *this;
+    }
 };
 struct lamb{
     //
@@ -73,6 +97,10 @@ struct lamb{
     }
 
 };
+bool operator<(lamb a, lamb b){
+    return a.v[0] < b.v[0];
+}
+
 void util_evalue( solution &xi, std::vector<asset>assetList){
     double income = 0;
     double risk = 0;
@@ -92,13 +120,21 @@ void util_print_gene( const solution&xi){
         std::cerr<<xi.gene[i]<<"\t";
     }
     std::cerr<<"Number: "<<counter<<"\tFitness: "<<xi.fitness[0]<<" "<<xi.fitness[1]<<std::endl;
+    /*
+    for(int i = 0; i<xi.raw_data.size(); i++){
+        std::cerr<<xi.raw_data[i].id<<"\t";
+    }
+    std::cerr<<std::endl;
+     */
+    for(int i = 0; i<xi.raw_data.size(); i++){
+        std::cerr<<xi.raw_data[i].max_buy<<"\t";
+    }
+    std::cerr<<std::endl;
 }
 bool util_dominate(const struct solution &x, const struct solution&y){
-    for(int i = 0; i<2; i++){
-        if(x.fitness[i]<y.fitness[i])
-            return false;
-    }
-    return true;
+    if(x.fitness[0]>y.fitness[0]&&x.fitness[1]<y.fitness[1])
+        return true;
+    return false;
 }
 void util_repair_gene( solution &xi, const std::vector<asset>&assetList ){
     //1. Check Cardinality Constraint
@@ -137,13 +173,16 @@ void util_repair_gene( solution &xi, const std::vector<asset>&assetList ){
                     xi_buffer= xi;
                 else
                     xi_buffer = local_best;
-                xi_buffer.gene[port[j]] = 0;
-                std::cerr<<"\nx"<<j<<" buffer:\n";
+                if(xi_buffer.gene[port[j]]!=0)
+                    xi_buffer.gene[port[j]] = 0;
+                else
+                    continue;
+                //std::cerr<<"\nx"<<j<<" buffer:\n";
                 util_evalue(xi_buffer, assetList);
-                util_print_gene(xi_buffer);
+                //util_print_gene(xi_buffer);
                 if(j==0){
                     local_best_2 = xi_buffer;
-                    util_print_gene(local_best_2);
+                    //util_print_gene(local_best_2);
                 }else{
                     if(util_dominate(xi_buffer, local_best_2)){
                         local_best_2 = xi_buffer;
@@ -151,14 +190,15 @@ void util_repair_gene( solution &xi, const std::vector<asset>&assetList ){
                 }
             }
             local_best = local_best_2;
+            /*
             std::cerr<<"\nLocal best 2\n";
             util_print_gene(local_best_2);
             std::cerr<<"\nLocal best:\n";
             util_print_gene(local_best);
             std::cerr<<std::endl;
+             */
         }
         xi = local_best;
-
     }
 
     for(int i = 0; i<xi.gene.size(); i++){
@@ -185,6 +225,7 @@ void util_repair_gene( solution &xi, const std::vector<asset>&assetList ){
                 xi.gene[i]-=minus;
         }
     }
+    util_evalue(xi, assetList);
 }
 void util_findK( const int i, int k, int upper, int*h){
     int u = 0;
@@ -251,113 +292,7 @@ void util_display_nn_id( const std::vector<lamb> &lamblist){
         std::cout<<std::endl;
     }
 }
-
-void planA(std::vector<struct asset>&assetArray){
-    for(int i = 0; i<assetArray.size(); i++){
-        assetArray[i].max_buy = assetArray[i].max_buy+assetArray[i].holding;
-        //assetArray[i].holding = 0;
-    }
-}
-bool operator<(lamb a, lamb b){
-    return a.v[0] < b.v[0];
-}
-
-bool init_lamb( const int &k, const int &H, std::vector<lamb>&lamb_list ){
-    for(int i = 0; i<N; i++){
-        double source_number = randG();
-        struct lamb buffer;
-        buffer.id = i;
-        buffer.v[0] = static_cast<double>(static_cast<int>(source_number*H))/ static_cast<double>(H);
-        //std::cerr<<i<<":"<<buffer.v[0]<<std::endl;
-        buffer.v[1] = 1 - buffer.v[0];
-        lamb_list.push_back(buffer);
-    }
-    return true;
-}
-
-
-
-void process_genetic( solution &m, solution &n, const std::vector<asset>&assetList, solution&trail){
-    //
-    //Crossover - one point
-    //
-    solution trail_y;
-    int dot = randG()*m.gene.size();
-    for(int i = 0; i<m.gene.size(); i++) {
-        int trail_y_buffer = 0;
-        if (i < dot) {
-            trail_y_buffer = m.gene[i];
-        }
-        else{
-            trail_y_buffer = n.gene[i];
-        }
-        trail_y.gene.push_back(trail_y_buffer);
-    }
-    /*
-    std::cerr<<"\nM:\n";
-    util_print_gene(m);
-    std::cerr<<"\nN:\n";
-    util_print_gene(n);
-    std::cerr<<"\nTrail before repair\n";
-    util_print_gene(trail_y);
-    util_repair_gene(trail_y, assetList);
-    std::cerr<<"\nTrail after repair\n";
-    util_print_gene(trail_y);
-     */
-    //
-    //Mutation
-    //
-    for(int i = 0; i<m.gene.size(); i++){
-
-    }
-}
-
-void init_distance( std::vector<lamb> &lamb_list ){
-    if(mainprocess)   std::cerr<<"[1.2]: Start\tInit Distance"<<std::endl;
-    std::priority_queue<lamb>nearest_list;
-    int length = lamb_list.size();
-    for(int i = 0; i<length; i++){
-        lamb buffer = lamb_list.back();
-        //std::cout<<buffer.v[0]<<"\t"<<buffer.v[1]<<std::endl;
-        lamb_list.pop_back();
-        nearest_list.push(buffer);
-    }
-    std::vector<lamb> toHandle;
-    while(!nearest_list.empty()){
-        lamb buffer = nearest_list.top();
-        toHandle.push_back(buffer);
-        nearest_list.pop();
-    }
-
-    for(int i = 0; i<toHandle.size(); i++){
-        lamb buffer = toHandle[i];
-        int h[K] = {};
-        util_findK(i, K, toHandle.size(), h);
-        for(int j = 0; j<K; j++){
-            buffer.k_nearest.push_back(toHandle[h[j]]);
-        }
-        lamb_list.push_back(buffer);
-    }
-    if(mainprocess)   std::cerr<<"[1.2]: *End*\tInit Distance"<<std::endl;
-}
-
-void ffunction(const solution&xi,
-               const std::vector<asset>&assetArray,
-               double&income,
-               double&risk){
-    for(int i = 0; i<xi.gene.size(); i++){
-        if(xi.gene[i]!=0){
-            income+=xi.gene[i]*assetArray[i].mean_income;
-            risk+=xi.gene[i]*assetArray[i].diviation_r;
-        }
-    }
-    if(p_1_3_detail) {
-        std::cerr << "[1.3]: Income:\t" << income
-                  << "\tRisk:\t" << risk << std::endl;
-    }
-}
-
-void fund_distribute( std::vector<struct asset>&p, double&fund, int n, int mode){
+void util_fundDistribute( std::vector<struct asset>&p, double&fund, int n, int mode){
 
     if(p[n].max_buy<p[n].min_buy){
         check:
@@ -370,7 +305,7 @@ void fund_distribute( std::vector<struct asset>&p, double&fund, int n, int mode)
         if(buyable){
             for (int i = 0; i < p.size(); i++) {
                 if (p[i].max_buy > p[i].min_buy&&fund/p[i].current_price>p[i].min_buy) {
-                    fund_distribute(p, fund, i, 0);
+                    util_fundDistribute(p, fund, i, 0);
                 }
             }
         }
@@ -381,7 +316,7 @@ void fund_distribute( std::vector<struct asset>&p, double&fund, int n, int mode)
     if(fund/p[n].current_price<p[n].min_buy){
         for(int i = 0; i<p.size(); i++){
             if(fund/p[i].current_price>=p[i].min_buy){
-                fund_distribute(p, fund, i, 0);
+                util_fundDistribute(p, fund, i, 0);
             }
         }
         return;
@@ -411,16 +346,263 @@ void fund_distribute( std::vector<struct asset>&p, double&fund, int n, int mode)
     if(n<=0||mode == 1){
         rn:
         double s = randG();
-        fund_distribute(p, fund, int(s*p.size()),1);
+        util_fundDistribute(p, fund, int(s*p.size()),1);
     }
     else {
-        fund_distribute(p, fund, n - 1, 0);
+        util_fundDistribute(p, fund, n - 1, 0);
     }
 }
+void util_preprocess(std::vector<struct asset> &assetArray){
+    for(int i = 0; i<assetArray.size(); i++){
+        assetArray[i].max_buy = assetArray[i].max_buy+assetArray[i].holding;
+        //assetArray[i].holding = 0;
+    }
+}
+void util_ffunction(const solution &xi,
+                    const std::vector<asset> &assetArray,
+                    double &income,
+                    double &risk){
+    for(int i = 0; i<xi.gene.size(); i++){
+        if(xi.gene[i]!=0){
+            income+=xi.gene[i]*assetArray[i].mean_income;
+            risk+=xi.gene[i]*assetArray[i].diviation_r;
+        }
+    }
+    if(p_1_3_detail) {
+        std::cerr << "[1.3]: Income:\t" << income
+                  << "\tRisk:\t" << risk << std::endl;
+    }
+}
+double max(const double a, const double b){
+    if(a>b)
+        return a;
+    return b;
+}
+double util_tchebycheff(const struct solution &x,
+                        const struct lamb lb,
+                        const double *z_star){
+    double result;
+    double temp[2];
+    for(int i = 0; i<2; i++){
+        temp[i] = std::abs((x.fitness[i]-z_star[i])*lb.v[i]);
+    }
+    result = max(temp[0], temp[1]);
+    return result;
+}
+
+void process_updateZ( const population &x, double z[]){
+    for(int i = 0; i<x.xi.size(); i++){
+        if(x.xi[i].fitness[0]>z[0]){
+            z[0] = x.xi[i].fitness[0];
+        }
+        if(x.xi[i].fitness[1]<z[1]){
+            z[1] = x.xi[i].fitness[1];
+        }
+    }
+    if(mainprocess){
+        std::cerr<<"[2.3]:\tUpdate z:\t"
+            <<"\n\t\tMax income:\t"<<z[0]<<"\t"<<"\tMin risk:\t"
+            <<z[1]<<std::endl;
+    }
+}
+void process_genetic( solution &m, solution &n, const std::vector<asset>&assetList, solution&trail){
+    //
+    //Crossover - one point
+    //
+    int M = 10;
+    solution trail_y;
+    int dot = randG()*m.gene.size();
+    for(int i = 0; i<m.gene.size(); i++) {
+        int trail_y_buffer = 0;
+        if (i < dot) {
+            trail_y_buffer = m.gene[i];
+            trail_y.raw_data[i] = m.raw_data[i];
+        }
+        else{
+            trail_y_buffer = n.gene[i];
+            trail_y.raw_data[i] = n.raw_data[i];
+        }
+        trail_y.gene.push_back(trail_y_buffer);
+    }
+    if(genetic_state) {
+        std::cerr << "M:\n";
+        util_print_gene(m);
+        std::cerr << "N:\n";
+        util_print_gene(n);
+        std::cerr << "Trail before repair\n";
+        util_print_gene(trail_y);
+        util_repair_gene(trail_y, assetList);
+        std::cerr << "Trail after repair\n";
+        util_print_gene(trail_y);
+    }
+    double roll_dice = randG();
+    double mu = 1;
+    if(roll_dice<mu){
+        //
+        //Mutation
+        //
+        int counter = 0;
+        std::vector<asset>trail_asset;
+        std::vector<int>random_list;
+        double trail_fund = 0;
+        double fund = 0;
+        for(int i = 0; i<trail_y.gene.size(); i++){
+            fund += assetList[i].current_price*assetList[i].holding;
+            if(trail_y.gene[i]!=0){
+                counter++;
+                trail_fund += trail_y.gene[i] * assetList[i].current_price;
+            }
+            else{
+                random_list.push_back(i);
+            }
+        }
+        //std::cerr<<"Counter:\t"<<counter<<"\tBuffer fund:\t"<<trail_fund<<std::endl;
+        std::vector<int>index_random;
+        for(int i = 0; i<M-counter; i++){
+            int temp_index;
+            roll:
+            temp_index = randG()*random_list.size();
+            for(auto item:index_random){
+                if(temp_index == item)
+                    goto roll;
+            }
+            index_random.push_back(temp_index);
+            asset temp_trail_meta = trail_y.raw_data[random_list[temp_index]];
+            //std::cerr<<"Empty index:\t"<<random_list[temp_index]<<"\t";
+            trail_asset.push_back(temp_trail_meta);
+        }
+        if(counter<M&&trail_fund<fund){
+            int differ = counter-M;
+            double buffer_fund = fund - trail_fund;
+            //std::cerr<<"Size of trail asset\t"<<trail_asset.size()<<std::endl;
+            util_fundDistribute(trail_asset, buffer_fund, trail_asset.size()-1, 0);
+        }
+        /*
+        for(int i = 0; i<trail_asset.size(); i++){
+            std::cerr<<trail_asset[i].buy_asset_number<<"\t";
+        }
+         */
+        for(int i = 0; i<trail_y.gene.size(); i++){
+            for(int j = 0; j<trail_asset.size(); j++){
+                if(i == trail_asset[j].id){
+                    if(trail_y.gene[i] != 0)
+                        std::cerr<<"Error\n";
+                    trail_y.gene[i] = trail_asset[j].buy_asset_number;
+                    trail_y.raw_data[i] = trail_asset[j];
+                }
+            }
+        }
+    }
+    util_evalue(trail_y, assetList);
+    //util_print_gene(trail_y);
+    trail = trail_y;
+}
+void process_updateP(const std::vector<lamb>&lamblist,
+             double z[2],
+             const population &x,
+             population &new_x,
+             const std::vector<asset>&assetList ){
+    if(mainprocess){
+        std::cerr<<"[2]:\tUpdate\n";
+    }
+    //
+    //  [2.1] Reproduction
+    //
+    if(mainprocess){
+        std::cerr<<"[2.1]:\tStart\tReporduction\n";
+    }
+    for(int i = 0; i<N; i++){
+        solution trail_buffer;
+        int m = lamblist[i].k_nearest[static_cast<int>(randG() * lamblist[i].k_nearest.size())].id;
+        int n = lamblist[i].k_nearest[static_cast<int>(randG() * lamblist[i].k_nearest.size())].id;
+
+        solution m_buffer = x.xi[m];
+        solution n_buffer = x.xi[n];
+        //if(mainprocess) std::cerr<<"[2.1]:\tm:"<<m<<"\tn:"<<n<<std::endl;
+        process_genetic(m_buffer, n_buffer, assetList, trail_buffer);
+        new_x.xi.push_back(trail_buffer);
+    }
+}
+void process_updateN( population&new_x,
+                      population&x,
+                      const std::vector<asset>&assetList,
+                      const std::vector<lamb>&lambList,
+                      const double z[]){
+    if(mainprocess){
+        std::cerr<<"[2.4]: Start\tUpdate Neighborhood Population"<<std::endl;
+    }
+    for(int i = 0; i<N; i++){
+        for(int j = 0; j<lambList[i].k_nearest.size(); j++){
+            double y = util_tchebycheff(new_x.xi[i], lambList[i].k_nearest[j], z);
+            double x_j = util_tchebycheff(x.xi[lambList[i].k_nearest[j].id], lambList[i].k_nearest[j], z);
+            if (y<=x_j){
+                x.xi[lambList[i].k_nearest[j].id] = new_x.xi[i];
+            }
+        }
+    }
+    if(mainprocess)   std::cerr<<"[1.3]: *End*\tUpdate Neighborhood Population"<<std::endl;
+}
+
+void process_updateEP( const population&x, population&ep){
+    if(mainprocess){
+        std::cerr<<"[2.5]: Start\tUpdate EP\n";
+    }
+    for(int i = 0; i<x.xi.size(); i++){
+        for(int j = 0; j<x.xi.size(); j++){
+            if(util_dominate(x.xi[i], ep.xi[j])){
+                ep.xi[j] = x.xi[i];
+            }
+        }
+    }
+    if(mainprocess){
+        std::cerr<<"[2.5]: *End*\tUpdate EP\n";
+    }
+}
+bool init_lamb( const int &k, const int &H, std::vector<lamb>&lamb_list ){
+    for(int i = 0; i<N; i++){
+        double source_number = randG();
+        struct lamb buffer;
+        buffer.id = i;
+        buffer.v[0] = static_cast<double>(static_cast<int>(source_number*H))/ static_cast<double>(H);
+        //std::cerr<<i<<":"<<buffer.v[0]<<std::endl;
+        buffer.v[1] = 1 - buffer.v[0];
+        lamb_list.push_back(buffer);
+    }
+    return true;
+}
+void init_distance( std::vector<lamb> &lamb_list ){
+    if(mainprocess)   std::cerr<<"[1.2]: Start\tInit Distance"<<std::endl;
+    std::priority_queue<lamb>nearest_list;
+    int length = lamb_list.size();
+    for(int i = 0; i<length; i++){
+        lamb buffer = lamb_list.back();
+        //std::cout<<buffer.v[0]<<"\t"<<buffer.v[1]<<std::endl;
+        lamb_list.pop_back();
+        nearest_list.push(buffer);
+    }
+    std::vector<lamb> toHandle;
+    while(!nearest_list.empty()){
+        lamb buffer = nearest_list.top();
+        toHandle.push_back(buffer);
+        nearest_list.pop();
+    }
+
+    for(int i = 0; i<toHandle.size(); i++){
+        lamb buffer = toHandle[i];
+        int h[K] = {};
+        util_findK(i, K, toHandle.size(), h);
+        for(int j = 0; j<K; j++){
+            buffer.k_nearest.push_back(toHandle[h[j]]);
+        }
+        lamb_list.push_back(buffer);
+    }
+    if(mainprocess)   std::cerr<<"[1.2]: *End*\tInit Distance"<<std::endl;
+}
+
 
 void init_solution( std::vector<struct asset> &tobuy,
                     double&fund){
-    fund_distribute(tobuy, fund, tobuy.size()-1, 0);
+    util_fundDistribute(tobuy, fund, tobuy.size()-1, 0);
     if(initial_detail){
         for(int i = 0; i<tobuy.size(); i++){
             std::cerr<<"ID: "<<tobuy[i].id<<"\tMax: "<<tobuy[i].max_buy<<"\tMin: "
@@ -433,9 +615,9 @@ void init_solution( std::vector<struct asset> &tobuy,
     }
 }
 void init_population(struct population &x,
-                    const std::vector <struct asset> &asset,
-                    const struct Constraint constraint,
-                    const double (&correlation)[31][31]){
+                     const std::vector <struct asset> &asset,
+                     const struct Constraint constraint,
+                     const double (&correlation)[31][31]){
     if(mainprocess)   std::cerr<<"[1.3]: Start\tInit Population"<<std::endl;
     //Cardinality Constraint M:
     int M = constraint.max_assets;
@@ -496,10 +678,11 @@ void init_population(struct population &x,
         }
         for(auto item:tobuy){
             xi_buffer.gene[item.id] = item.buy_asset_number;
+            xi_buffer.raw_data[item.id] = item;
         }
         double income_buffer = 0;
         double risk_buffer;
-        ffunction(xi_buffer, asset, income_buffer, risk_buffer);
+        util_ffunction(xi_buffer, asset, income_buffer, risk_buffer);
         xi_buffer.fitness[0] = income_buffer;
         xi_buffer.fitness[1] = risk_buffer;
         x.xi.push_back(xi_buffer);
@@ -512,35 +695,6 @@ void init_population(struct population &x,
     }
     if(mainprocess)   std::cerr<<"[1.3]: *End*\tInit Population"<<std::endl;
 }
-
-void process_updateP(const std::vector<lamb>&lamblist,
-             double z[2],
-             const population &x,
-             population &new_x,
-             const std::vector<asset>&assetList ){
-    if(mainprocess){
-        std::cerr<<"[2]:\tUpdate\n";
-    }
-    //
-    //  [2.1] Reproduction
-    //
-    if(mainprocess){
-        std::cerr<<"[2.1]:\tStart\tReporduction\n";
-    }
-    int trail = 0;
-    for(int i = 0; i<N; i++){
-        solution trail_buffer;
-        int m = lamblist[i].k_nearest[static_cast<int>(randG() * lamblist[i].k_nearest.size())].id;
-        int n = lamblist[i].k_nearest[static_cast<int>(randG() * lamblist[i].k_nearest.size())].id;
-
-        solution m_buffer = x.xi[m];
-        solution n_buffer = x.xi[n];
-        //if(mainprocess) std::cerr<<"[2.1]:\tm:"<<m<<"\tn:"<<n<<std::endl;
-        if(trail == 0)  process_genetic(m_buffer, n_buffer, assetList, trail_buffer);
-        trail++;
-    }
-}
-
 
 
 void test_generator( std::vector<asset>&assetList ){
@@ -799,22 +953,8 @@ void mutation(struct solution&origin,
 }
 
 
-double max(const double a, const double b){
-    if(a>b)
-        return a;
-    return b;
-}
-double Tchebycheff(const struct solution&x,
-                   const struct lamb lb,
-                   const double z_star[2]){
-    double result;
-    double temp[2];
-    for(int i = 0; i<2; i++){
-        temp[i] = std::abs((x.fitness[i]-z_star[i])*lb.v[i]);
-    }
-    result = max(temp[0], temp[1]);
-    return result;
-}
+
+
 struct solution geneticOperation(const struct solution&x,
                                  const struct solution&y,
                                  double rate,
@@ -946,8 +1086,8 @@ void mainProcess(const std::vector<struct asset>&asset,
                 }
             }
             for(int j = 0; j<T; j++){
-                double Ta = Tchebycheff(S.xi[B[i][j]], lambList[B[i][j]], z_star);
-                double Tb = Tchebycheff(candidate, lambList[B[i][j]], z_star);
+                double Ta = util_tchebycheff(S.xi[B[i][j]], lambList[B[i][j]], z_star);
+                double Tb = util_tchebycheff(candidate, lambList[B[i][j]], z_star);
                 if(Tb>Ta){
                     S.xi[B[i][j]] = candidate;
                 }

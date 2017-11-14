@@ -91,6 +91,7 @@ bool loadItem( std::string path,
     std::fstream data(path, std::ios::in);
     std::string input_coach;
     unsigned int line = 1;
+    int id = 0;
     if(!data.is_open()){
         std::cerr<<"Error: "<<strerror(errno)<<std::endl;
         return false;
@@ -117,6 +118,8 @@ bool loadItem( std::string path,
         }
         if(line<=constraint.num_assets+1){
             struct asset assetInput;
+            assetInput.id = id;
+            id++;
             line_coach>>assetInput.current_price>>
                       assetInput.holding>>
                       assetInput.cost_buy>>

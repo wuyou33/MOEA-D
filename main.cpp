@@ -13,8 +13,8 @@
 using namespace std;
 
 int main(){
-    //std::string FILE_PATH = "/home/molin/CLionProjects/MOEA-D/DataSet/portreb1.txt";
-    std::string FILE_PATH = "/Users/mirror/ClionProjects/MOEA-D/DataSet/portreb1.txt";
+    std::string FILE_PATH = "/home/molin/CLionProjects/MOEA-D/DataSet/portreb1.txt";
+    //std::string FILE_PATH = "/Users/mirror/ClionProjects/MOEA-D/DataSet/portreb1.txt";
     struct Constraint port1_constraint;
     double port1_correlations[31][31] = {};
     vector <struct asset> assetArray;
@@ -24,7 +24,7 @@ int main(){
         //buffer = getchar();
         //s[i] = (buffer =='1'?true:false);
     }
-    setting(s);
+
     //
     //Check input
     //
@@ -33,7 +33,7 @@ int main(){
                 assetArray,
                 port1_constraint,
                 port1_correlations)) {
-        planA(assetArray);
+        util_preprocess(assetArray);
         /*
         for (int i = 0; i < port1_constraint.num_assets; i++) {
             cout << assetArray[i].holding<<"\t"<<
@@ -46,6 +46,7 @@ int main(){
 
     }
 
+    setting(s, assetArray);
     //
     //Check random number genrator
     //
@@ -71,6 +72,7 @@ int main(){
     population x;
     init_population(x, assetArray, port1_constraint, port1_correlations);
     population ep;
+    ep = x;
     //1.4 Initialize Z solution
     double z_population[2];
     double max_income = 0;
@@ -88,16 +90,32 @@ int main(){
     cerr<<"[1.4]:\tInitialize z pupulation:\t"
         <<"\n\t\tMax income:\t"<<z_population[0]<<"\t"<<"\tMin risk:\t"
         <<z_population[1]<<endl;
+    int generation = 1000;
 
-    //[2] Update population
-    population new_x;
-    process_updateP(lamblist, z_population, x, new_x, assetArray);
-    int test_set[32] = {0,0,191,82,176,0,0,64,0,0,0,69,70,0,226, 0, 76, 0, 0, 58, 0, 0, 0, 0,
-                      0, 227, 0, 0, 0, 83, 65};
-    solution test_solution;
-    for(int i = 0; i<32; i++){
-        test_solution.gene.push_back(test_set[i]);
+    for(int i = 0; i<generation; i++){
+        //[2] Update population
+        //cerr<<"\nGENRATION\t"<<i<<endl;
+        population new_x;
+        process_updateP(lamblist, z_population, x, new_x, assetArray);
+        process_updateZ(new_x, z_population);
+
+        /*
+        int test_set[32] = {0,0,191,82,176,0,0,64,0,0,0,69,70,0,226, 0, 76, 0, 0, 58, 0, 0, 0, 0,
+                          0, 227, 0, 0, 0, 83, 65};
+        solution test_solution;
+        for(int i = 0; i<32; i++){
+            test_solution.gene.push_back(test_set[i]);
+        }
+        //util_print_gene(test_solution);
+        util_repair_gene(test_solution, assetArray);
+         */
+        process_updateN(new_x, x, assetArray, lamblist, z_population);
+        process_updateEP(x, ep);
+        if(i%10==1){
+            for(int j = 0; j<ep.xi.size(); j++){
+                cerr<<ep.xi[j].fitness[0]<<"\t"<<ep.xi[j].fitness[1]<<"\t"<<i<<"\n";
+            }
+        }
+
     }
-    util_print_gene(test_solution);
-    util_repair_gene(test_solution, assetArray);
 }
