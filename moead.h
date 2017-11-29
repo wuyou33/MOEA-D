@@ -14,10 +14,13 @@
 #include <cmath>
 #include <random>
 #include <exception>
+#include <algorithm>
+#include <set>
+#include <omp.h>
 #include "randG.h"
 #include "loader.h"
 //Population's sizetrue
-#define N 100
+int N = 100;
 //K nearest neighbors
 #define K 11//Cannot assign 10. I don't know why.
 bool mainprocess = false;
@@ -39,6 +42,7 @@ struct solution{//i.e. x_i
     std::vector<int> gene;
     std::vector<asset> raw_data;
     double fitness[2]={};
+    int solution_id = 0;
     void init(){
         for(auto asset_item:raw_asset){
             raw_data.push_back(asset_item);
@@ -50,25 +54,18 @@ struct solution{//i.e. x_i
 
     struct solution &operator = (const struct solution x){
         this->gene.clear();
-        for(int i = 0; i<x.gene.size(); i++){
-            this->gene.push_back(x.gene[i]);
-        }
+        this->gene.assign(x.gene.begin(), x.gene.end());
         this->fitness[0] = x.fitness[0];
         this->fitness[1] = x.fitness[1];
+        this->solution_id = x.solution_id;
+        this->raw_data.assign(x.raw_data.begin(), x.raw_data.end());
         return *this;
-        for(int i = 0; i<x.raw_data.size(); i++){
-            this->raw_data[i] = x.raw_data[i];
-        }
     }
 };
 struct population{
     std::vector<solution> xi;
     struct population &operator = (const struct population x){
-        for(int i = 0; i<x.xi.size(); i++){
-            solution temp_push;
-            temp_push = x.xi[i];
-            this->xi.push_back(temp_push);
-        }
+        this->xi.assign(x.xi.begin(), x.xi.end());
         return *this;
     }
 };
@@ -358,7 +355,7 @@ void util_preprocess(std::vector<struct asset> &assetArray){
         //assetArray[i].holding = 0;
     }
 }
-void util_ffunction(const solution &xi,
+void util_ffunction(solution &xi,
                     const std::vector<asset> &assetArray,
                     double &income,
                     double &risk){
@@ -368,6 +365,8 @@ void util_ffunction(const solution &xi,
             risk+=xi.gene[i]*assetArray[i].diviation_r;
         }
     }
+    xi.fitness[0] = income;
+    xi.fitness[1] = risk;
     if(p_1_3_detail) {
         std::cerr << "[1.3]: Income:\t" << income
                   << "\tRisk:\t" << risk << std::endl;
@@ -511,16 +510,22 @@ void process_updateP(const std::vector<lamb>&lamblist,
     if(mainprocess){
         std::cerr<<"[2.1]:\tStart\tReporduction\n";
     }
-    for(int i = 0; i<N; i++){
-        solution trail_buffer;
-        int m = lamblist[i].k_nearest[static_cast<int>(randG() * lamblist[i].k_nearest.size())].id;
-        int n = lamblist[i].k_nearest[static_cast<int>(randG() * lamblist[i].k_nearest.size())].id;
+    omp_set_num_threads(32);
+    int chunksize = 10;
+#pragma omp parallel shared(chunksize) private(i, t_id)
+    {
+#pragma omp for schedule(dynamic, chunksize)
+        for (int i = 0; i < N; i++) {
+            solution trail_buffer;
+            int m = lamblist[i].k_nearest[static_cast<int>(randG() * lamblist[i].k_nearest.size())].id;
+            int n = lamblist[i].k_nearest[static_cast<int>(randG() * lamblist[i].k_nearest.size())].id;
 
-        solution m_buffer = x.xi[m];
-        solution n_buffer = x.xi[n];
-        //if(mainprocess) std::cerr<<"[2.1]:\tm:"<<m<<"\tn:"<<n<<std::endl;
-        process_genetic(m_buffer, n_buffer, assetList, trail_buffer);
-        new_x.xi.push_back(trail_buffer);
+            solution m_buffer = x.xi[m];
+            solution n_buffer = x.xi[n];
+            //if(mainprocess) std::cerr<<"[2.1]:\tm:"<<m<<"\tn:"<<n<<std::endl;
+            process_genetic(m_buffer, n_buffer, assetList, trail_buffer);
+            new_x.xi.push_back(trail_buffer);
+        }
     }
 }
 void process_updateN( population&new_x,
@@ -632,6 +637,7 @@ void init_population(struct population &x,
     }
     for(int i = 0; i<N; i++){
         solution xi_buffer;
+        //Todo: Improve with std::set
         struct Set candidate;
         //Handling cardinality constraint by using pointers.
         //std::cerr<<"[1.3]: \t\tStart\tassign assets\n";
@@ -644,22 +650,27 @@ void init_population(struct population &x,
             if(buffer>=0) {
                 if(!candidate.isin(buffer)){
                     candidate.data.push_back(buffer);
+                    struct asset asset_buffer = asset[buffer];
+                    tobuy.push_back(asset_buffer);
                 }
             }
         }
+        /*
         for(int i = 0; i<candidate.data.size(); i++){
             int buffer_id = candidate.data[i];
             struct asset asset_buffer = asset[buffer_id];
             asset_buffer.id = buffer_id;
             tobuy.push_back(asset_buffer);
         }
-        std::priority_queue<int, std::vector<int>, std::greater<int>>tobuy_ase;
-        for(int i = 0; i<tobuy.size(); i++){
-            //std::cerr<<tobuy[i].id<<"\t";
-            int buffer = tobuy[i].id;
-            tobuy_ase.push(buffer);
-        }
+         */
+
         if(p_1_3_detail) {
+            std::priority_queue<int, std::vector<int>, std::greater<int>>tobuy_ase;
+            for(int i = 0; i<tobuy.size(); i++){
+                //std::cerr<<tobuy[i].id<<"\t";
+                int buffer = tobuy[i].id;
+                tobuy_ase.push(buffer);
+            }
             std::cerr << "[1.3]:\tPort " << i << ":\t";
             while (!tobuy_ase.empty()) {
                 std::cerr << tobuy_ase.top() << "\t";
@@ -683,27 +694,51 @@ void init_population(struct population &x,
         double income_buffer = 0;
         double risk_buffer;
         util_ffunction(xi_buffer, asset, income_buffer, risk_buffer);
-        xi_buffer.fitness[0] = income_buffer;
-        xi_buffer.fitness[1] = risk_buffer;
         x.xi.push_back(xi_buffer);
-        if(show_gene) {
-            for (int i = 0; i < xi_buffer.gene.size(); i++) {
-                std::cout << xi_buffer.gene[i] << " ";
-            }
-            std::cout << std::endl;
-        }
     }
     if(mainprocess)   std::cerr<<"[1.3]: *End*\tInit Population"<<std::endl;
 }
 
-
-void test_generator( std::vector<asset>&assetList ){
+void fun_test_DE( solution &a, solution &b, solution &c, solution &x, std::vector<aset>&assetList){
 
 }
 
+void process_DE( population &x, std::vector<asset>&assetList ){
+
+    double CR = 0.8;
+    double F = 0.4;
+    for(int i = 0; i<x.xi.size(); i++){
+        x.xi[i].solution_id = i;
+    }
+    for(int i = 0; i<x.xi.size(); i++){
+        solution sub_xi = x.xi[i];
+        std::set<int> pool;
+        pool.insert(sub_xi.solution_id);
+        int i1 = 0;
+        std::set<int>::iterator iter;
+        std::vector<solution>parents;
+        while(i1<3){
+            int buffer = randG()*x.xi.size();
+            if((iter = pool.find(buffer)) != pool.end()){
+                continue;
+            }
+            else{
+                pool.insert(buffer);
+                solution s_buffer = x.xi[buffer];
+                parents.push_back(s_buffer);
+                i1++;
+            }
+        }
+        for(int i2 = 0; i2<x.xi[i].gene.size(); i2++){
+            double diceCR = randG();
+            if(diceCR>CR){
+                sub_xi.gene[i] = parents[0].gene[i] + F*(parents[1].gene[i]-parents[2].gene[i]);
+
+            }
+        }
 
 
-void de_process(std::vector<int>h, std::vector<int>m, std::vector<int>n){
+    }
     solution trail;
     //
     //Mutation
