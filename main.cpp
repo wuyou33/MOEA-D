@@ -15,6 +15,7 @@ using namespace std;
 int main(){
     clock_t start, end;
     start = clock();
+    std::string OUTFILE_PATH = "/home/molin/Documents/output.txt";
     std::string FILE_PATH = "/home/molin/CLionProjects/MOEA-D/DataSet/portreb1.txt";
     //std::string FILE_PATH = "/Users/mirror/ClionProjects/MOEA-D/DataSet/portreb1.txt";
     struct Constraint port1_constraint;
@@ -26,6 +27,8 @@ int main(){
         //buffer = getchar();
         //s[i] = (buffer =='1'?true:false);
     }
+    ofstream output;
+    output.open(OUTFILE_PATH);
 
     //
     //Check input
@@ -36,30 +39,9 @@ int main(){
                 port1_constraint,
                 port1_correlations)) {
         util_preprocess(assetArray);
-        /*
-        for (int i = 0; i < port1_constraint.num_assets; i++) {
-            cout << assetArray[i].holding<<"\t"<<
-                 assetArray[i].min_buy<<"\t"<<
-                 assetArray[i].max_buy<< "\t"<<
-                 assetArray[i].max_sell<<"\t"<<
-                 assetArray[i].mean_income<<endl;
-        }
-         */
-
     }
-
     setting(s, assetArray);
-    //
-    //Check random number genrator
-    //
-    /*
-    for(int i = 0; i<10; i++){
-        cout<<randG()<<endl;
-    }
-     */
-    //
-    //Check init_lamb
-    //
+    //[1.1]Initial lambda array
     vector <lamb> lamblist;
     if(init_lamb(2, 99, lamblist)){
         for(auto item:lamblist){
@@ -97,12 +79,6 @@ int main(){
             if (x.xi[i].fitness[1] < min_risk) {
                 min_risk = x.xi[i].fitness[1];
             }
-    for(int i = 0; i<x.xi.size(); i++){
-        if(x.xi[i].fitness[0]>max_income){
-            max_income = x.xi[i].fitness[0];
-        }
-        if(x.xi[i].fitness[1]<min_risk){
-            min_risk = x.xi[i].fitness[1];
         }
     }
     z_population[0] = max_income;
