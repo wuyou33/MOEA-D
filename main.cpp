@@ -13,6 +13,8 @@
 using namespace std;
 
 int main(){
+    clock_t start, end;
+    start = clock();
     std::string FILE_PATH = "/home/molin/CLionProjects/MOEA-D/DataSet/portreb1.txt";
     //std::string FILE_PATH = "/Users/mirror/ClionProjects/MOEA-D/DataSet/portreb1.txt";
     struct Constraint port1_constraint;
@@ -77,6 +79,24 @@ int main(){
     double z_population[2];
     double max_income = 0;
     double min_risk = x.xi[0].fitness[1];
+    int chunksize = 10;
+    int i, t_id, n;
+
+#pragma omp parallel shared(x, chunksize) private(i, t_id, n)
+    {
+#pragma omp for schedule(dynamic, chunk)
+        for (int i = 0; i < x.xi.size(); i++) {
+            if(i%chunksize==0){
+                n = i/chunksize;
+                t_id = omp_get_thread_num();
+                std::cerr<<"Thread id:"<<t_id<<" handles"<<n<<std::endl;
+            }
+            if (x.xi[i].fitness[0] > max_income) {
+                max_income = x.xi[i].fitness[0];
+            }
+            if (x.xi[i].fitness[1] < min_risk) {
+                min_risk = x.xi[i].fitness[1];
+            }
     for(int i = 0; i<x.xi.size(); i++){
         if(x.xi[i].fitness[0]>max_income){
             max_income = x.xi[i].fitness[0];
@@ -118,4 +138,6 @@ int main(){
         }
 
     }
+    end = clock();
+    cout<<end-start<<endl;
 }

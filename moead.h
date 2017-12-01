@@ -14,6 +14,7 @@
 #include <cmath>
 #include <random>
 #include <exception>
+#include <omp.h>
 #include "randG.h"
 #include "loader.h"
 //Population's sizetrue
@@ -511,16 +512,22 @@ void process_updateP(const std::vector<lamb>&lamblist,
     if(mainprocess){
         std::cerr<<"[2.1]:\tStart\tReporduction\n";
     }
-    for(int i = 0; i<N; i++){
-        solution trail_buffer;
-        int m = lamblist[i].k_nearest[static_cast<int>(randG() * lamblist[i].k_nearest.size())].id;
-        int n = lamblist[i].k_nearest[static_cast<int>(randG() * lamblist[i].k_nearest.size())].id;
+    omp_set_num_threads(32);
+    int chunksize = 10;
+#pragma omp parallel shared(chunksize) private(i, t_id)
+    {
+#pragma omp for schedule(dynamic, chunksize)
+        for (int i = 0; i < N; i++) {
+            solution trail_buffer;
+            int m = lamblist[i].k_nearest[static_cast<int>(randG() * lamblist[i].k_nearest.size())].id;
+            int n = lamblist[i].k_nearest[static_cast<int>(randG() * lamblist[i].k_nearest.size())].id;
 
-        solution m_buffer = x.xi[m];
-        solution n_buffer = x.xi[n];
-        //if(mainprocess) std::cerr<<"[2.1]:\tm:"<<m<<"\tn:"<<n<<std::endl;
-        process_genetic(m_buffer, n_buffer, assetList, trail_buffer);
-        new_x.xi.push_back(trail_buffer);
+            solution m_buffer = x.xi[m];
+            solution n_buffer = x.xi[n];
+            //if(mainprocess) std::cerr<<"[2.1]:\tm:"<<m<<"\tn:"<<n<<std::endl;
+            process_genetic(m_buffer, n_buffer, assetList, trail_buffer);
+            new_x.xi.push_back(trail_buffer);
+        }
     }
 }
 void process_updateN( population&new_x,
