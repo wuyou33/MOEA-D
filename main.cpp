@@ -15,7 +15,7 @@ using namespace std;
 int main(){
     clock_t start, end;
     start = clock();
-    std::string OUTFILE_PATH = "/home/molin/Documents/output.txt";
+    std::string OUTFILE_PATH = "/home/molin/Documents/MOEAD_out.txt";
     std::string FILE_PATH = "/home/molin/CLionProjects/MOEA-D/DataSet/portreb1.txt";
     //std::string FILE_PATH = "/Users/mirror/ClionProjects/MOEA-D/DataSet/portreb1.txt";
     struct Constraint port1_constraint;
@@ -29,11 +29,9 @@ int main(){
     }
     ofstream output;
     output.open(OUTFILE_PATH);
-
     //
     //Check input
     //
-
     if(loadItem(  FILE_PATH,
                 assetArray,
                 port1_constraint,
@@ -71,7 +69,7 @@ int main(){
             if(i%chunksize==0){
                 n = i/chunksize;
                 t_id = omp_get_thread_num();
-                std::cerr<<"Thread id:"<<t_id<<" handles"<<n<<std::endl;
+                //std::cerr<<"Thread id:"<<t_id<<" handles"<<n<<std::endl;
             }
             if (x.xi[i].fitness[0] > max_income) {
                 max_income = x.xi[i].fitness[0];
@@ -94,25 +92,16 @@ int main(){
         population new_x;
         process_updateP(lamblist, z_population, x, new_x, assetArray);
         process_updateZ(new_x, z_population);
-
-        /*
-        int test_set[32] = {0,0,191,82,176,0,0,64,0,0,0,69,70,0,226, 0, 76, 0, 0, 58, 0, 0, 0, 0,
-                          0, 227, 0, 0, 0, 83, 65};
-        solution test_solution;
-        for(int i = 0; i<32; i++){
-            test_solution.gene.push_back(test_set[i]);
-        }
-        //util_print_gene(test_solution);
-        util_repair_gene(test_solution, assetArray);
-         */
         process_updateN(new_x, x, assetArray, lamblist, z_population);
         process_updateEP(x, ep);
+        if(i%10 == 1){
+            cerr<<i<<endl;
+        }
         if(i%10==1){
             for(int j = 0; j<ep.xi.size(); j++){
-                cerr<<ep.xi[j].fitness[0]<<"\t"<<ep.xi[j].fitness[1]<<"\t"<<i<<"\n";
+                output<<ep.xi[j].fitness[0]<<"\t"<<ep.xi[j].fitness[1]<<"\t"<<i<<"\n";
             }
         }
-
     }
     end = clock();
     cout<<end-start<<endl;
