@@ -444,6 +444,13 @@ void util_wrap( solution &raw, std::vector<asset>assetList ){
             }
             raw.gene.push_back(buffer);
         }
+    }else{
+        if(raw.gene.size()==raw.data.size()){
+            for(int i = 0; i<raw.data.size(); i++){
+                int buffer = raw.data[i].buy_asset_number;
+                raw.gene[i] = buffer;
+            }
+        }
     }
     if(n<M){
         util_evalue(raw, assetList);
@@ -459,22 +466,74 @@ void util_proved_genetic( solution &m,
     //Crossover
     int num = 0;
     int dot = randG()*m.gene.size();
+    std::vector<int>bought_index;
+    std::vector<asset>tobuy;
     for(int i = 0; i<m.gene.size(); i++){
         if(i<dot){
             if(m.gene[i]!=0)
+            {
                 num++;
+                int buffer_index;
+                bought_index.push_back(buffer_index);
+            }else{
+                asset tobuy_buffer = m.data[i];
+                tobuy.push_back(tobuy_buffer);
+            }
             trail.data[i].buy_asset_number = m.gene[i];
         }else{
             if(n.gene[i]!=0)
+            {
                 num++;
+                int buffer_index;
+                bought_index.push_back(buffer_index);
+            }else{
+                asset tobuy_buffer = n.data[i];
+                tobuy.push_back(tobuy_buffer);
+            }
             trail.data[i].buy_asset_number = n.gene[i];
         }
     }
     util_wrap(trail, assetList);
 
     if(num>M){
+        int differ = num-M;
+        for(int i = 0; i<differ; i++){
+            int rm_index = randG()*bought_index.size();
+            trail.data[bought_index[rm_index]].buy_asset_number = 0;
+        }
+        util_wrap(trail, assetList);
+    }
+    if(num<M){
         int differ = M-num;
-        
+        std::vector<asset>buy;
+        std::set<int>buy_index_set;
+
+        int alert = 0;
+        for(int i = 0; i<differ; ){
+            int buy_index = randG() *tobuy.size();
+            alert++;
+            if(alert>20){
+                exit(11);
+            }
+            auto iter = buy_index_set.find(buy_index);
+            if(iter==buy_index_set.end()){
+                asset buy_asset = tobuy[buy_index];
+                buy.push_back(buy_asset);
+                buy_index_set.insert(buy_index);
+                i++;
+            }
+        }
+        double local_fund = 0;
+        for(int i = 0; i<bought_index.size(); i++){
+            local_fund += trail.data[bought_index[i]].buy_asset_number*trail.data[bought_index[i]].current_price;
+        }
+        util_fundDistribute(buy, local_fund, buy.size()-1, 0);
+        for(int i = 0; i<trail.data.size(); i++){
+            auto iter = buy_index_set.find(i);
+            if(iter!=buy_index_set.end()){
+                buy_index_set
+            }
+        }
     }
 }
 void process_genetic( solution &m, solution &n, const std::vector<asset>&assetList, solution&trail){
